@@ -58,36 +58,37 @@ def minFunction(input):
 
         j += 1
 
+    last = j
     error = max(tf_min)/(3600*24) 
-    time_vector = np.linspace(0, error, N)
+    time_vector = np.linspace(0, error, last)
     
     #print(error)
     
     # Plot
     if (plot_boolean == 1):
         plot.subplot(2, 2, 1)
-        plot.plot(time_vector, X[0:N, 0]) # a
+        plot.plot(time_vector, X[0:last, 0]) # a
         plot.axhline(y = keplerian_elements_final.a, color = 'r', linestyle = '--')
         plot.xlabel('Time [days]')
         plot.xlim([0, error])
         plot.ylabel('a [km]')
 
         plot.subplot(2, 2, 2)
-        plot.plot(time_vector, np.sqrt( X[0:N, 1]**2 + X[0:N, 2]**2) ) # e
+        plot.plot(time_vector, np.sqrt( X[0:last, 1]**2 + X[0:last, 2]**2) ) # e
         plot.axhline(y = keplerian_elements_final.e, color = 'r', linestyle = '--')
         plot.xlabel('Time [days]')
         plot.xlim([0, error])
         plot.ylabel('e [adim]')
 
         plot.subplot(2, 2, 3)
-        plot.plot(time_vector, 2*np.arctan( np.sqrt( X[0:N, 3]**2 + X[0:N, 4]**2 ) ) ) # i
+        plot.plot(time_vector, 2*np.arctan( np.sqrt( X[0:last, 3]**2 + X[0:last, 4]**2 ) ) ) # i
         plot.axhline(y = keplerian_elements_final.i, color = 'r', linestyle = '--')
         plot.xlabel('Time [days]')
         plot.xlim([0, error])
         plot.ylabel('i [rad]')
         
         plot.subplot(2, 2, 4)
-        plot.plot(time_vector, X[0:N, 5]) # mass
+        plot.plot(time_vector, X[0:last, 5]) # mass
         plot.xlabel('Time [days]')
         plot.xlim([0, error])
         plot.ylabel('mass')
@@ -116,7 +117,7 @@ def odeFunction(t, X, weights_vectors):
     # F_in = np.pi # F_in: F entrance into Earth shadow (upper boundary for the integration)
 
     [F_ex, F_en] = shadowEffect(t, X)
-    F_steps = np.linspace(-np.pi, np.pi, 40) # F_ex , F_en
+    F_steps = np.linspace(-np.pi, np.pi, 20) # F_ex, F_en
 
     if (F_ex > F_en):
         idx1 = np.where(F_steps <= F_en)
@@ -128,16 +129,12 @@ def odeFunction(t, X, weights_vectors):
         idx_tot = idx2[0]
 
     integral = 0
-    for j in range(F_steps.size-1): # trapezoidal rule to evaluate the integral        
+    for j in range(F_steps.size-1): # trapezoidal rule to evaluate the integral
         delta_F = F_steps[j+1] - F_steps[j]
         delta_fun = 0
-        if np.where(idx_tot == j):
-            delta_fun = delta_fun + firstDerivatives(F_steps[j], X, weights, 0)
-        else:
-            delta_fun = delta_fun + firstDerivatives(F_steps[j], X, weights, 1)
-        
-        delta_fun = delta_fun + firstDerivatives(F_steps[j+1], X, weights, 1)
-        
+        if np.where(idx_tot != j):
+            delta_fun = firstDerivatives(F_steps[j+1], X, weights) + firstDerivatives(F_steps[j], X, weights)
+
         integral = integral + delta_fun/2*delta_F
         # the X is not updated at each step: all of the equinoctial elements (+ mass) remaines constant over the period, the F is the only one that changes!
     
@@ -264,7 +261,7 @@ def shadowEffect(t, X):
     return F_ex, F_en
 
 
-def firstDerivatives(F, X, weights, coeff):
+def firstDerivatives(F, X, weights):
  
     g0 = astroConstants(4) # [km/s**2]
     gravitational_parameter = astroConstants(13)
@@ -351,8 +348,8 @@ def firstDerivatives(F, X, weights, coeff):
     u = np.dot(weight_a, u_a) + np.dot(weight_e, u_e) + np.dot(weight_i, u_i)
     u = u/np.linalg.norm([u[0], u[1], u[2]])
 
-    delta = coeff * np.arctan2(u[0], u[1])
-    sigma = coeff * np.arcsin(u[2])
+    delta = np.arctan2(u[0], u[1])
+    sigma = np.arcsin(u[2])
     
     dr = np.sqrt(dX**2 + dY**2)
 
